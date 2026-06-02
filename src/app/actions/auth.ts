@@ -1,0 +1,155 @@
+"use server";
+
+import { eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
+import { db } from "@/lib/db";
+import { users } from "@/lib/db/schema";
+import { hashPassword, verifyPassword } from "@/lib/auth/password";
+import { verifyTotp } from "@/lib/auth/totp";
+import {
+  createSession,
+  destroySession,
+  setPending,
+  getPending,
+  clearPending,
+} from "@/lib/auth/session";
+import { headers } from "next/headers";
+import { getUserRow } from "@/lib/auth/user";
+import { getDictionary } from "@/lib/i18n/server";
+import { checkRateLimit, registerFailure, resetLimit } from "@/lib/auth/rate-limit";
+
+export type ActionResult = { ok: true } | { ok: false; error: string };
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+// Per-client key so a brute-forcer throttles themselves without locking the
+// real owner out from a different network. Both login steps share the key.
+async function loginKey(): Promise<string> {
+  const ip = (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim();
+  return `login:${ip || "local"}`;
+}
+
+// ── First-run setup: set email + password, enroll TOTP ────────────────────
+export async function completeSetup(input: {
+  email: string;
+  password: string;
+  secret: string;
+  token: string;
+}): Promise<ActionResult> {
+  const t = (await getDictionary()).setup;
+  const email = normalizeEmail(input.email);
+  const password = input.password;
+
+  if (!email || !email.includes("@")) {
+    return { ok: false, error: t.invalidEmail };
+  }
+  if (password.length < 8) {
+    return { ok: false, error: t.passwordMin };
+  }
+
+  const existing = await getUserRow();
+  if (existing?.isSetup) {
+    return { ok: false, error: t.accountExists };
+  }
+
+  if (!(await verifyTotp(input.token, input.secret))) {
+    return { ok: false, error: t.invalidTotp };
+  }
+
+  const passwordHash = await hashPassword(password);
+
+  let userId: string;
+  if (existing) {
+    await db
+      .update(users)
+      .set({ email, passwordHash, totpSecret: input.secret, isSetup: true })
+      .where(eq(users.id, existing.id));
+    userId = existing.id;
+  } else {
+    const [created] = await db
+      .insert(users)
+      .values({ email, passwordHash, totpSecret: input.secret, isSetup: true })
+      .returning({ id: users.id });
+    userId = created.id;
+  }
+
+  await createSession(userId);
+  return { ok: true };
+}
+
+// ── Login step 1: verify password, issue short-lived pending marker ───────
+export async function loginStep1(
+  email: string,
+  password: string,
+): Promise<ActionResult> {
+  const t = (await getDictionary()).login;
+  const key = await loginKey();
+
+  const limit = checkRateLimit(key);
+  if (!limit.ok) {
+    return {
+      ok: false,
+      error: t.tooManyAttempts.replace("{sec}", String(limit.retryAfterSec)),
+    };
+  }
+
+  const user = await getUserRow();
+  const normalized = normalizeEmail(email);
+
+  const valid =
+    user?.isSetup &&
+    user.passwordHash &&
+    user.email === normalized &&
+    (await verifyPassword(password, user.passwordHash));
+
+  if (!user || !valid) {
+    registerFailure(key);
+    return { ok: false, error: t.invalidCredentials };
+  }
+
+  // Password OK — don't reset yet; TOTP must still pass (step 2).
+  await setPending(user.id);
+  return { ok: true };
+}
+
+// ── Login step 2: verify TOTP against the pending marker, open session ────
+export async function loginStep2(token: string): Promise<ActionResult> {
+  const t = (await getDictionary()).login;
+  const key = await loginKey();
+
+  const limit = checkRateLimit(key);
+  if (!limit.ok) {
+    return {
+      ok: false,
+      error: t.tooManyAttempts.replace("{sec}", String(limit.retryAfterSec)),
+    };
+  }
+
+  const pending = await getPending();
+  if (!pending) {
+    return { ok: false, error: t.sessionExpired };
+  }
+
+  const user = await getUserRow();
+  if (!user?.totpSecret || user.id !== pending.userId) {
+    registerFailure(key);
+    return { ok: false, error: t.verifyFailed };
+  }
+
+  if (!(await verifyTotp(token, user.totpSecret))) {
+    registerFailure(key);
+    return { ok: false, error: t.invalidCode };
+  }
+
+  await clearPending();
+  resetLimit(key);
+  await createSession(user.id);
+  return { ok: true };
+}
+
+export async function logout(): Promise<void> {
+  await destroySession();
+  redirect("/login");
+}
