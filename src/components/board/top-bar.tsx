@@ -7,6 +7,7 @@ import { setLocale } from "@/app/actions/locale";
 import { useI18n } from "@/lib/i18n/context";
 import { THEME_COOKIE } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { Logo } from "@/components/logo";
 
 export function TopBar({
   email,
@@ -19,11 +20,14 @@ export function TopBar({
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface/85 backdrop-blur-md">
       <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
-        <div className="min-w-0">
-          <h1 className="text-lg font-extrabold tracking-tight text-fg">
-            {t.appName}
-          </h1>
-          <p className="truncate text-xs text-faint">{email}</p>
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Logo className="size-8 shrink-0" />
+          <div className="min-w-0">
+            <h1 className="text-lg font-extrabold tracking-tight text-fg">
+              {t.appName}
+            </h1>
+            <p className="truncate text-xs text-faint">{email}</p>
+          </div>
         </div>
         <TopMenu onOpenSettings={onOpenSettings} />
       </div>

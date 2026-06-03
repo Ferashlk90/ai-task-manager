@@ -4,6 +4,7 @@ import { LoginForm } from "./login-form";
 import { getDictionary } from "@/lib/i18n/server";
 import { LanguageToggle } from "@/components/language-toggle";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Logo } from "@/components/logo";
 
 export const dynamic = "force-dynamic";
 
@@ -20,9 +21,12 @@ export default async function LoginPage() {
         <LanguageToggle />
       </div>
       <div className="w-full max-w-sm">
-        <h1 className="mb-6 text-center text-2xl font-extrabold text-fg">
-          {t.appName}
-        </h1>
+        <div className="mb-6 flex flex-col items-center gap-3">
+          <Logo className="size-14" />
+          <h1 className="text-center text-2xl font-extrabold text-fg">
+            {t.appName}
+          </h1>
+        </div>
         <LoginForm />
       </div>
     </main>
