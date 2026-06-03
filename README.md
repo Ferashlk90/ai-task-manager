@@ -26,12 +26,11 @@ model (Claude, GPT, Gemini, or DeepSeek). Fully bilingual with right-to-left sup
 
 ## Screenshots
 
-<!-- Add a screenshot or two here (board + task panel) — e.g.:
-![Board](./docs/board.png)
-![Task panel](./docs/task-panel.png)
--->
+![Board — light mode](./docs/LightMode.png)
 
-_Coming soon._
+![Board — dark mode](./docs/DarkMode.png)
+
+![Per-task AI assistant](./docs/DarkModeAssistantOpen.png)
 
 ## Stack
 
