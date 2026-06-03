@@ -57,9 +57,9 @@ const ar = {
 
   composer: {
     placeholder:
-      "اكتب كل مهامك هنا بأي لغة وأي ترتيب… سيقوم الذكاء الاصطناعي بتصنيفها حسب الشركة والأولوية.",
+      "اكتب كل مهامك هنا بأي لغة وأي ترتيب… سيصنّفها الذكاء الاصطناعي حسب المجموعة والفئة والأولوية.",
     hintShortcut: "⌘/Ctrl + Enter للتنظيم",
-    hintAddCompanies: "أضف شركاتك من الإعدادات لتحسين التصنيف",
+    hintAddCompanies: "أضف المجموعات والفئات من الإعدادات لتحسين التصنيف",
     organize: "تنظيم",
     organizing: "جارٍ التنظيم…",
     added: "تمت إضافة {count} مهمة وتنظيمها.",
@@ -130,10 +130,10 @@ const ar = {
     title: "المساعد",
     open: "افتح المساعد",
     intro:
-      "اسأل عن مهامك عبر جميع الشركات — ما العاجل، ما المتوقّف، وما الذي يجب التركيز عليه.",
+      "اسأل عن مهامك عبر جميع المجموعات — ما العاجل، ما المتوقّف، وما الذي يجب التركيز عليه.",
     placeholder: "اسأل عن مهامك…",
     examples: [
-      "ما المهام العاجلة عبر كل الشركات؟",
+      "ما المهام العاجلة عبر كل المجموعات؟",
       "ما الذي يجب أن أركّز عليه اليوم؟",
       "لخّص المهام قيد التنفيذ.",
     ],
@@ -248,9 +248,9 @@ const en: Dictionary = {
 
   composer: {
     placeholder:
-      "Write all your tasks here, in any language and any order… AI will classify them by company and priority.",
+      "Write all your tasks here, in any language and any order… AI will sort them by group, category, and priority.",
     hintShortcut: "⌘/Ctrl + Enter to organize",
-    hintAddCompanies: "Add your companies in settings to improve classification",
+    hintAddCompanies: "Add groups and categories in settings to improve classification",
     organize: "Organize",
     organizing: "Organizing…",
     added: "Added and organized {count} task(s).",
@@ -321,10 +321,10 @@ const en: Dictionary = {
     title: "Assistant",
     open: "Open assistant",
     intro:
-      "Ask about your tasks across all companies — what's urgent, what's stuck, and what to focus on.",
+      "Ask about your tasks across all your groups — what's urgent, what's stuck, and what to focus on.",
     placeholder: "Ask about your tasks…",
     examples: [
-      "What's urgent across all my companies?",
+      "What's urgent across all my groups?",
       "What should I focus on today?",
       "Summarize my in-progress tasks.",
     ],
