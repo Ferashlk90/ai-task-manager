@@ -124,3 +124,7 @@ before first use.
 ## License
 
 [MIT](./LICENSE) © Feras Al Hallak
+
+---
+
+<sub>If this is useful to you, a ⭐ helps others discover it.</sub>
