@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n/context";
 import { ChatMarkdown } from "@/components/chat-markdown";
+import { CopyMessageButton } from "@/components/board/copy-message-button";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -84,7 +84,9 @@ export function AssistantChat() {
         ) : (
           messages.map((m, i) => <Bubble key={i} role={m.role} text={m.content} />)
         )}
-        {streaming && <Bubble role="assistant" text={streamingText || "…"} />}
+        {streaming && (
+          <Bubble role="assistant" text={streamingText || "…"} streaming />
+        )}
         <div ref={bottomRef} />
       </div>
 
@@ -130,19 +132,34 @@ export function AssistantChat() {
   );
 }
 
-function Bubble({ role, text }: { role: "user" | "assistant"; text: string }) {
-  const isUser = role === "user";
+function Bubble({
+  role,
+  text,
+  streaming,
+}: {
+  role: "user" | "assistant";
+  text: string;
+  streaming?: boolean;
+}) {
+  if (role === "user") {
+    return (
+      <div
+        dir="auto"
+        className="ms-auto max-w-[88%] whitespace-pre-wrap rounded-2xl bg-accent px-3 py-2 text-sm leading-6 text-on-accent"
+      >
+        {text}
+      </div>
+    );
+  }
   return (
-    <div
-      dir="auto"
-      className={cn(
-        "max-w-[88%] rounded-2xl px-3 py-2 text-sm leading-6",
-        isUser
-          ? "ms-auto whitespace-pre-wrap bg-accent text-on-accent"
-          : "me-auto bg-surface-strong text-strong",
-      )}
-    >
-      {isUser ? text : <ChatMarkdown>{text}</ChatMarkdown>}
+    <div className="me-auto max-w-[88%]">
+      <div
+        dir="auto"
+        className="rounded-2xl bg-surface-strong px-3 py-2 text-sm leading-6 text-strong"
+      >
+        <ChatMarkdown>{text}</ChatMarkdown>
+      </div>
+      {!streaming && text && <CopyMessageButton text={text} />}
     </div>
   );
 }

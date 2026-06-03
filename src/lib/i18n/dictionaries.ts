@@ -125,6 +125,8 @@ const ar = {
       "اطلب المساعدة في تنفيذ هذه المهمة — صياغة محتوى، كتابة كود، تحليل، أو خطة عمل.",
     placeholder: "اكتب رسالتك…",
     send: "إرسال",
+    copy: "نسخ",
+    copied: "تم النسخ",
     error: "تعذّر الحصول على رد. تحقق من إعداد الذكاء الاصطناعي.",
   },
 
@@ -318,6 +320,8 @@ const en: Dictionary = {
       "Ask for help executing this task — drafting content, writing code, analysis, or an action plan.",
     placeholder: "Type your message…",
     send: "Send",
+    copy: "Copy",
+    copied: "Copied",
     error: "Couldn’t get a reply. Check the AI configuration.",
   },
 
