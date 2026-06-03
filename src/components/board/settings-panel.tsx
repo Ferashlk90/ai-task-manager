@@ -242,6 +242,9 @@ function EnglishSettings({ enabled }: { enabled: boolean }) {
         />
         {t.taskSettings.toggleLabel}
       </label>
+      <p className="mt-1.5 text-xs leading-5 text-muted">
+        {t.taskSettings.description}
+      </p>
       {enabled && (
         <div className="mt-3 flex flex-wrap items-center gap-3">
           <Button size="sm" variant="subtle" onClick={backfill} loading={pending}>

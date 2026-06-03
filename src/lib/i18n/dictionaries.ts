@@ -106,7 +106,9 @@ const ar = {
   },
   taskSettings: {
     heading: "النسخ الإنجليزية",
-    toggleLabel: "إنشاء نسخة إنجليزية من المهام (للمشاركة مع الزملاء)",
+    toggleLabel: "إنشاء نسخة إنجليزية لكل مهمة",
+    description:
+      "تبقى كل مهمة بلغتها الأصلية مع إضافة نسخة إنجليزية مطابقة — مفيدة لمشاركة المهام مع زملاء يتحدثون الإنجليزية أو عند العمل بين لغتين.",
     backfill: "ترجمة المهام الحالية",
     backfilling: "جارٍ الترجمة…",
     backfillDone: "تمت ترجمة {count} مهمة",
@@ -297,7 +299,9 @@ const en: Dictionary = {
   },
   taskSettings: {
     heading: "English versions",
-    toggleLabel: "Generate English versions of tasks (to share with co-workers)",
+    toggleLabel: "Generate an English version of each task",
+    description:
+      "Each task keeps its original language and gets a faithful English copy — useful for sharing with English-speaking colleagues or working across languages.",
     backfill: "Translate existing tasks",
     backfilling: "Translating…",
     backfillDone: "Translated {count} task(s)",
