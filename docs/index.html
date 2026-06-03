@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AI Personal Task Manager — brain-dump in, clean board out</title>
+<meta name="description" content="A self-hosted, single-user task manager built around an AI organizer. Paste a messy list in any language; get a structured, bilingual board. Bring your own model — Claude, GPT, Gemini, or DeepSeek." />
+<meta property="og:title" content="AI Personal Task Manager" />
+<meta property="og:description" content="Brain-dump your tasks in English or Arabic — an LLM structures them into a clean board, translates them, and helps you execute each one. Self-hosted. MIT." />
+<meta property="og:image" content="./LightMode.png" />
+<meta property="og:type" content="website" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect width='512' height='512' rx='116' fill='%2314171a'/%3E%3Cpath d='M148 270 L222 344 L366 168' fill='none' stroke='%23fff' stroke-width='48' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=Geist:wght@300..700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0f1214;
+    --bg-tile: #14171a;
+    --surface: #181c20;
+    --surface-2: #1e2329;
+    --line: #2a3037;
+    --line-soft: #21262c;
+    --fg: #eef1f3;
+    --muted: #98a2ac;
+    --faint: #6b757e;
+    --accent: #3ddc84;
+    --accent-dim: #2bb56b;
+    --accent-glow: rgba(61, 220, 132, 0.16);
+    --serif: "Fraunces", Georgia, serif;
+    --sans: "Geist", -apple-system, BlinkMacSystemFont, sans-serif;
+    --mono: "Geist Mono", "SFMono-Regular", ui-monospace, monospace;
+    --maxw: 1140px;
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-weight: 400;
+    line-height: 1.6;
+    font-size: 17px;
+    overflow-x: hidden;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Grain + grid atmosphere */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,0.018) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.018) 1px, transparent 1px);
+    background-size: 64px 64px;
+    mask-image: radial-gradient(ellipse 90% 60% at 50% 0%, #000 30%, transparent 80%);
+  }
+  body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 28px; position: relative; z-index: 1; }
+  a { color: inherit; text-decoration: none; }
+
+  /* ---------- Nav ---------- */
+  nav {
+    position: sticky; top: 0; z-index: 50;
+    backdrop-filter: blur(14px);
+    background: rgba(15, 18, 20, 0.72);
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .nav-inner { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .brand { display: flex; align-items: center; gap: 11px; font-weight: 600; letter-spacing: -0.01em; }
+  .brand svg { width: 30px; height: 30px; border-radius: 8px; }
+  .nav-links { display: flex; align-items: center; gap: 30px; }
+  .nav-links a.nlink {
+    font-size: 13.5px; color: var(--muted); font-weight: 450;
+    transition: color 0.2s; position: relative;
+  }
+  .nav-links a.nlink:hover { color: var(--fg); }
+  .nav-links a.nlink::after {
+    content: ""; position: absolute; left: 0; bottom: -6px; height: 1px; width: 0;
+    background: var(--accent); transition: width 0.25s var(--ease);
+  }
+  .nav-links a.nlink:hover::after { width: 100%; }
+  @media (max-width: 720px) { .nav-links .nlink { display: none; } }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 13.5px; font-weight: 500; font-family: var(--sans);
+    padding: 9px 16px; border-radius: 9px; cursor: pointer;
+    transition: transform 0.18s var(--ease), background 0.2s, border-color 0.2s, box-shadow 0.2s;
+    border: 1px solid transparent; white-space: nowrap;
+  }
+  .btn svg { width: 16px; height: 16px; }
+  .btn-primary { background: var(--accent); color: #07140c; box-shadow: 0 0 0 0 var(--accent-glow); }
+  .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 30px var(--accent-glow); }
+  .btn-ghost { background: var(--surface); color: var(--fg); border-color: var(--line); }
+  .btn-ghost:hover { transform: translateY(-2px); border-color: #3a424b; background: var(--surface-2); }
+  .btn-lg { padding: 13px 24px; font-size: 15px; border-radius: 11px; }
+
+  /* ---------- Hero ---------- */
+  header { position: relative; padding: 120px 0 90px; text-align: center; }
+  .hero-glow {
+    position: absolute; top: -120px; left: 50%; transform: translateX(-50%);
+    width: 900px; height: 600px; z-index: 0; pointer-events: none;
+    background: radial-gradient(ellipse 50% 50% at 50% 50%, var(--accent-glow), transparent 70%);
+    filter: blur(20px);
+  }
+  .eyebrow {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 26px; display: inline-flex; align-items: center; gap: 10px;
+  }
+  .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); animation: pulse 2.4s var(--ease) infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  h1.hero-title {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(42px, 7vw, 84px);
+    line-height: 1.02;
+    letter-spacing: -0.025em;
+    margin-bottom: 28px;
+  }
+  h1.hero-title em { font-style: italic; color: var(--accent); font-weight: 380; }
+  .hero-sub {
+    max-width: 600px; margin: 0 auto 38px; color: var(--muted);
+    font-size: clamp(16px, 2vw, 19px); line-height: 1.62; font-weight: 350;
+  }
+  .hero-cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; margin-bottom: 46px; }
+
+  .providers { display: inline-flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: center; }
+  .providers .label { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--faint); }
+  .providers .chips { display: inline-flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .chip {
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+    padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface);
+    transition: color 0.2s, border-color 0.2s;
+  }
+  .chip:hover { color: var(--accent); border-color: var(--accent-dim); }
+
+  /* ---------- Browser screenshot frame ---------- */
+  .showcase { margin-top: 12px; perspective: 2000px; }
+  .frame {
+    border-radius: 14px; overflow: hidden; border: 1px solid var(--line);
+    background: var(--surface);
+    box-shadow: 0 40px 120px -30px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.02) inset;
+    transform: rotateX(4deg); transform-origin: center top;
+  }
+  .frame-bar {
+    display: flex; align-items: center; gap: 8px; padding: 12px 16px;
+    background: var(--surface-2); border-bottom: 1px solid var(--line-soft);
+  }
+  .frame-bar .dots { display: flex; gap: 7px; }
+  .frame-bar .dots span { width: 11px; height: 11px; border-radius: 50%; background: #353c44; }
+  .frame-bar .url {
+    margin: 0 auto; font-family: var(--mono); font-size: 11.5px; color: var(--faint);
+    background: var(--bg); padding: 4px 14px; border-radius: 6px; border: 1px solid var(--line-soft);
+  }
+  .frame img { display: block; width: 100%; height: auto; }
+
+  /* ---------- Section scaffolding ---------- */
+  section { padding: 92px 0; position: relative; }
+  .sec-head { max-width: 620px; margin-bottom: 52px; }
+  .sec-head.center { margin-left: auto; margin-right: auto; text-align: center; }
+  .kicker {
+    font-family: var(--mono); font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--accent); margin-bottom: 16px;
+  }
+  h2 {
+    font-family: var(--serif); font-weight: 400; font-size: clamp(30px, 4.4vw, 46px);
+    line-height: 1.08; letter-spacing: -0.02em;
+  }
+  h2 em { font-style: italic; color: var(--accent); }
+  .sec-head p { margin-top: 16px; color: var(--muted); font-size: 17px; font-weight: 350; }
+
+  /* ---------- Features ---------- */
+  .feat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  @media (max-width: 900px) { .feat-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 600px) { .feat-grid { grid-template-columns: 1fr; } }
+  .card {
+    background: linear-gradient(180deg, var(--surface), var(--bg-tile));
+    border: 1px solid var(--line-soft); border-radius: 16px; padding: 28px 26px;
+    transition: transform 0.3s var(--ease), border-color 0.3s, box-shadow 0.3s;
+    position: relative; overflow: hidden;
+  }
+  .card::before {
+    content: ""; position: absolute; inset: 0; border-radius: 16px; padding: 1px;
+    background: linear-gradient(160deg, var(--accent-glow), transparent 40%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude; opacity: 0; transition: opacity 0.3s;
+  }
+  .card:hover { transform: translateY(-5px); border-color: #313942; box-shadow: 0 24px 50px -24px rgba(0,0,0,0.7); }
+  .card:hover::before { opacity: 1; }
+  .card .ico {
+    width: 42px; height: 42px; border-radius: 11px; display: grid; place-items: center;
+    background: var(--accent-glow); color: var(--accent); margin-bottom: 20px;
+  }
+  .card .ico svg { width: 21px; height: 21px; }
+  .card h3 { font-size: 18px; font-weight: 550; letter-spacing: -0.01em; margin-bottom: 9px; }
+  .card p { color: var(--muted); font-size: 14.5px; line-height: 1.58; font-weight: 350; }
+
+  /* ---------- Steps ---------- */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  @media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
+  .step { border-top: 1px solid var(--line); padding-top: 22px; }
+  .step .num { font-family: var(--serif); font-style: italic; font-size: 40px; color: var(--accent); line-height: 1; margin-bottom: 16px; }
+  .step h3 { font-size: 18px; font-weight: 550; margin-bottom: 8px; letter-spacing: -0.01em; }
+  .step p { color: var(--muted); font-size: 14.5px; font-weight: 350; line-height: 1.58; }
+
+  /* ---------- Split screenshot ---------- */
+  .split { display: grid; grid-template-columns: 1fr 1.25fr; gap: 56px; align-items: center; }
+  .split.flip { grid-template-columns: 1.25fr 1fr; }
+  .split.flip .split-text { order: 2; }
+  @media (max-width: 840px) { .split, .split.flip { grid-template-columns: 1fr; gap: 32px; } .split.flip .split-text { order: 0; } }
+  .split-text h2 { margin-bottom: 18px; }
+  .split-text p { color: var(--muted); font-weight: 350; font-size: 16px; margin-bottom: 14px; }
+  .split-text ul { list-style: none; margin-top: 22px; display: grid; gap: 12px; }
+  .split-text li { display: flex; gap: 11px; align-items: flex-start; font-size: 14.5px; color: var(--fg); font-weight: 350; }
+  .split-text li svg { width: 18px; height: 18px; color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+  .shot { border-radius: 14px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 30px 70px -30px rgba(0,0,0,0.75); transition: transform 0.4s var(--ease); }
+  .shot:hover { transform: translateY(-4px); }
+  .shot img { display: block; width: 100%; height: auto; }
+
+  /* ---------- Stack ---------- */
+  .stack-pills { display: flex; flex-wrap: wrap; gap: 12px; }
+  .pill {
+    font-family: var(--mono); font-size: 13.5px; color: var(--fg);
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 16px; display: inline-flex; align-items: center; gap: 9px;
+    transition: border-color 0.2s, transform 0.2s var(--ease), color 0.2s;
+  }
+  .pill:hover { border-color: var(--accent-dim); transform: translateY(-2px); }
+  .pill b { color: var(--accent); font-weight: 500; }
+
+  /* ---------- Self-host / CTA ---------- */
+  .cta-box {
+    border: 1px solid var(--line); border-radius: 22px; padding: 60px 48px; text-align: center;
+    background:
+      radial-gradient(ellipse 70% 120% at 50% 0%, var(--accent-glow), transparent 60%),
+      linear-gradient(180deg, var(--surface), var(--bg-tile));
+    position: relative; overflow: hidden;
+  }
+  .cta-box h2 { margin-bottom: 14px; }
+  .cta-box > p { color: var(--muted); max-width: 520px; margin: 0 auto 34px; font-weight: 350; }
+  .terminal {
+    max-width: 560px; margin: 0 auto 30px; text-align: left;
+    background: var(--bg); border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+  }
+  .terminal-bar { display: flex; align-items: center; gap: 7px; padding: 10px 14px; border-bottom: 1px solid var(--line-soft); }
+  .terminal-bar span { width: 10px; height: 10px; border-radius: 50%; background: #353c44; }
+  .terminal-bar .t { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--faint); }
+  .terminal-body { display: flex; align-items: center; gap: 12px; padding: 16px 18px; font-family: var(--mono); font-size: 13.5px; }
+  .terminal-body code { color: var(--fg); white-space: nowrap; overflow-x: auto; }
+  .terminal-body code .pmt { color: var(--accent); user-select: none; }
+  .copy {
+    margin-left: auto; flex-shrink: 0; background: var(--surface-2); border: 1px solid var(--line);
+    color: var(--muted); border-radius: 7px; padding: 6px 10px; font-family: var(--mono); font-size: 11px;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .copy:hover { color: var(--accent); border-color: var(--accent-dim); }
+  .cta-note { font-family: var(--mono); font-size: 12px; color: var(--faint); }
+  .cta-note b { color: var(--muted); font-weight: 500; }
+
+  /* ---------- Footer ---------- */
+  footer { border-top: 1px solid var(--line-soft); padding: 48px 0 60px; margin-top: 40px; }
+  .foot-inner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
+  .foot-inner .brand svg { width: 26px; height: 26px; }
+  .foot-meta { font-family: var(--mono); font-size: 12.5px; color: var(--faint); display: flex; gap: 22px; flex-wrap: wrap; }
+  .foot-meta a { transition: color 0.2s; }
+  .foot-meta a:hover { color: var(--accent); }
+
+  /* ---------- Reveal animation ---------- */
+  .reveal { opacity: 0; transform: translateY(26px); transition: opacity 0.7s var(--ease), transform 0.7s var(--ease); }
+  .reveal.in { opacity: 1; transform: none; }
+  .hero-stagger > * { opacity: 0; transform: translateY(20px); animation: rise 0.8s var(--ease) forwards; }
+  .hero-stagger > *:nth-child(1) { animation-delay: 0.05s; }
+  .hero-stagger > *:nth-child(2) { animation-delay: 0.15s; }
+  .hero-stagger > *:nth-child(3) { animation-delay: 0.25s; }
+  .hero-stagger > *:nth-child(4) { animation-delay: 0.35s; }
+  .hero-stagger > *:nth-child(5) { animation-delay: 0.45s; }
+  .showcase.reveal { transition-delay: 0.2s; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal, .hero-stagger > * { opacity: 1 !important; transform: none !important; animation: none !important; }
+    html { scroll-behavior: auto; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top">
+      <svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="116" fill="#14171a"/><path d="M148 270 L222 344 L366 168" fill="none" stroke="#fff" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Task Manager
+    </a>
+    <div class="nav-links">
+      <a class="nlink" href="#features">Features</a>
+      <a class="nlink" href="#how">How it works</a>
+      <a class="nlink" href="#stack">Stack</a>
+      <a class="btn btn-ghost" href="https://github.com/Ferashlk90/ai-task-organizer" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-1.7c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5A11.5 11.5 0 0 0 23.5 12C23.5 5.7 18.3.5 12 .5z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- HERO -->
+<header id="top">
+  <div class="hero-glow"></div>
+  <div class="wrap hero-stagger">
+    <span class="eyebrow"><span class="dot"></span> Self-hosted · MIT · Bilingual</span>
+    <h1 class="hero-title">Brain-dump the chaos.<br />Get a <em>clean board.</em></h1>
+    <p class="hero-sub">Paste a messy list of tasks in plain English or Arabic. An LLM structures them by bucket, priority, and type, translates them, and helps you execute each one — all on infrastructure you own.</p>
+    <div class="hero-cta">
+      <a class="btn btn-primary btn-lg" href="https://github.com/Ferashlk90/ai-task-organizer" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5C5.7.5.5 5.7.5 12c0 5.1 3.3 9.4 7.9 10.9.6.1.8-.2.8-.5v-1.7c-3.2.7-3.9-1.5-3.9-1.5-.5-1.3-1.3-1.7-1.3-1.7-1.1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.3 1.2a11.5 11.5 0 0 1 6 0C17.3 4.7 18.3 5 18.3 5c.6 1.6.2 2.8.1 3.1.8.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.3c0 .3.2.6.8.5A11.5 11.5 0 0 0 23.5 12C23.5 5.7 18.3.5 12 .5z"/></svg>
+        View on GitHub
+      </a>
+      <a class="btn btn-ghost btn-lg" href="https://github.com/Ferashlk90/ai-task-organizer#readme" target="_blank" rel="noopener">Read the docs →</a>
+    </div>
+    <div class="providers">
+      <span class="label">Bring your own model</span>
+      <span class="chips">
+        <span class="chip">Claude</span>
+        <span class="chip">GPT</span>
+        <span class="chip">Gemini</span>
+        <span class="chip">DeepSeek</span>
+      </span>
+    </div>
+  </div>
+
+  <div class="wrap showcase reveal" style="margin-top:64px">
+    <div class="frame">
+      <div class="frame-bar">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <div class="url">localhost:3000</div>
+      </div>
+      <img src="./LightMode.png" alt="The task board — a brain-dump composer above color-coded task cards grouped by bucket, with search and status tabs." loading="lazy" />
+    </div>
+  </div>
+</header>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="kicker">// What it does</div>
+      <h2>One paste in.<br /><em>A structured board</em> out.</h2>
+      <p>Everything you need to turn scattered thoughts into an executable plan — and nothing that phones home.</p>
+    </div>
+    <div class="feat-grid">
+      <div class="card reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v3m0 12v3m9-9h-3M6 12H3m13.5-6.5-2 2m-7 7-2 2m11 0-2-2m-7-7-2-2"/><circle cx="12" cy="12" r="3.2"/></svg></div>
+        <h3>AI organizer</h3>
+        <p>Paste free text, get structured tasks — bucket, priority, type, and a faithful English translation — in a single step.</p>
+      </div>
+      <div class="card reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 9h14M5 15h14"/><path d="M11 5 9 19m6-14-2 14"/></svg></div>
+        <h3>Bilingual, RTL-ready</h3>
+        <p>Full English + Arabic UI. Tasks keep their original language and get a shareable English version side by side.</p>
+      </div>
+      <div class="card reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="13" rx="2.5"/><path d="m8 21 4-4 4 4M9 9h6m-6 3.5h3.5"/></svg></div>
+        <h3>Bring your own model</h3>
+        <p>Switch between Anthropic Claude, OpenAI GPT, Google Gemini, and DeepSeek. Only providers whose key you set appear.</p>
+      </div>
+      <div class="card reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.5 8.5 0 0 1-12.5 7.5L3 20l1-5.5A8.5 8.5 0 1 1 21 11.5Z"/><path d="M8.5 11.5h.01M12 11.5h.01M15.5 11.5h.01"/></svg></div>
+        <h3>Per-task AI chat</h3>
+        <p>Ask the model to actually do the task — draft, code, analyze. Conversation history is saved per task.</p>
+      </div>
+      <div class="card reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3 4 6v5c0 5 3.4 8.4 8 10 4.6-1.6 8-5 8-10V6l-8-3Z"/><path d="m9 12 2 2 4-4"/></svg></div>
+        <h3>Private by design</h3>
+        <p>Password + authenticator-app (TOTP) login, rate limiting, signed-cookie sessions, and a strict Content-Security-Policy.</p>
+      </div>
+      <div class="card reveal">
+        <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></div>
+        <h3>Fast board</h3>
+        <p>Search, a bucket filter, and New · In&nbsp;progress · Done status tabs that all compose together. Dark mode, PWA, JSON/CSV export.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head center reveal">
+      <div class="kicker">// The loop</div>
+      <h2>Three steps, <em>start to done.</em></h2>
+    </div>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="num">01</div>
+        <h3>Brain-dump</h3>
+        <p>Type or paste everything on your mind — any language, any order, no formatting. Hit ⌘/Ctrl + Enter.</p>
+      </div>
+      <div class="step reveal">
+        <div class="num">02</div>
+        <h3>Organize</h3>
+        <p>The model splits it into discrete tasks, each tagged with a bucket, priority, and work type, and translated.</p>
+      </div>
+      <div class="step reveal">
+        <div class="num">03</div>
+        <h3>Execute</h3>
+        <p>Work the board with search and status tabs. Open any task and chat with AI to actually get it done.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SPLIT: dark board -->
+<section>
+  <div class="wrap split reveal">
+    <div class="split-text">
+      <div class="kicker">// The board</div>
+      <h2>Color-coded, <em>at a glance.</em></h2>
+      <p>Tasks group under the buckets you define — businesses, clients, or projects — each with its own accent. Filter, search, and switch status tabs without losing your place.</p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 13 4 4L19 7"/></svg> Buckets you add, edit, and reorder yourself</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 13 4 4L19 7"/></svg> Search across titles, descriptions, and English versions</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 13 4 4L19 7"/></svg> Light and dark themes, built in</li>
+      </ul>
+    </div>
+    <div class="shot"><img src="./DarkMode.png" alt="The board in dark mode with color-coded buckets and status tabs." loading="lazy" /></div>
+  </div>
+</section>
+
+<!-- SPLIT: assistant -->
+<section>
+  <div class="wrap split flip reveal">
+    <div class="split-text">
+      <div class="kicker">// The assistant</div>
+      <h2>An AI that <em>does the task.</em></h2>
+      <p>Open any task and start a conversation. Draft the email, write the code, outline the deck — the assistant has the task's context and remembers the thread.</p>
+      <ul>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 13 4 4L19 7"/></svg> History saved per task</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 13 4 4L19 7"/></svg> Streams responses in real time</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 13 4 4L19 7"/></svg> Runs on whichever model you configured</li>
+      </ul>
+    </div>
+    <div class="shot"><img src="./DarkModeAssistantOpen.png" alt="The per-task AI assistant panel open alongside the board." loading="lazy" /></div>
+  </div>
+</section>
+
+<!-- STACK -->
+<section id="stack">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <div class="kicker">// Under the hood</div>
+      <h2>Built on a <em>modern, boring</em> stack.</h2>
+      <p>Typed end to end, deployable anywhere Node runs, and easy to read.</p>
+    </div>
+    <div class="stack-pills reveal">
+      <span class="pill"><b>▲</b> Next.js 16 · App Router</span>
+      <span class="pill">TypeScript</span>
+      <span class="pill">Tailwind v4</span>
+      <span class="pill">Drizzle ORM</span>
+      <span class="pill">Postgres</span>
+      <span class="pill">Vercel AI SDK</span>
+      <span class="pill">TOTP auth</span>
+      <span class="pill">Server Actions</span>
+    </div>
+  </div>
+</section>
+
+<!-- SELF-HOST CTA -->
+<section>
+  <div class="wrap reveal">
+    <div class="cta-box">
+      <div class="kicker">// Your keys, your data</div>
+      <h2>Clone it. <em>Run it. Own it.</em></h2>
+      <p>No SaaS, no seats, no telemetry. One user, your database, your API keys. Up and running in a few minutes.</p>
+      <div class="terminal">
+        <div class="terminal-bar"><span></span><span></span><span></span><div class="t">bash</div></div>
+        <div class="terminal-body">
+          <code id="clone"><span class="pmt">$ </span>git clone https://github.com/Ferashlk90/ai-task-organizer.git</code>
+          <button class="copy" id="copyBtn" aria-label="Copy clone command">Copy</button>
+        </div>
+      </div>
+      <div class="cta-note">Then add a <b>DATABASE_URL</b> and at least one <b>provider key</b> — see the README.</div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="wrap foot-inner">
+    <a class="brand" href="#top">
+      <svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="116" fill="#14171a"/><path d="M148 270 L222 344 L366 168" fill="none" stroke="#fff" stroke-width="48" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Task Manager
+    </a>
+    <div class="foot-meta">
+      <a href="https://github.com/Ferashlk90/ai-task-organizer" target="_blank" rel="noopener">GitHub</a>
+      <a href="https://github.com/Ferashlk90/ai-task-organizer#readme" target="_blank" rel="noopener">Docs</a>
+      <span>MIT License</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Scroll reveal
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+    }
+  }, { threshold: 0.12, rootMargin: "0px 0px -60px 0px" });
+  document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+
+  // Copy clone command
+  const btn = document.getElementById("copyBtn");
+  btn.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText("git clone https://github.com/Ferashlk90/ai-task-organizer.git");
+      const old = btn.textContent; btn.textContent = "Copied ✓";
+      setTimeout(() => (btn.textContent = old), 1600);
+    } catch { /* clipboard blocked */ }
+  });
+</script>
+</body>
+</html>
