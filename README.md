@@ -1,6 +1,6 @@
 # AI Personal Task Manager
 
-**[🌐 Overview &amp; screenshots →](https://ferashlk90.github.io/ai-task-organizer/)**
+**[🌐 Overview &amp; screenshots →](https://ferashlk90.github.io/ai-task-manager/)**
 
 > Brain-dump your tasks in any language — an LLM structures them by bucket,
 > priority, and type, translates them, and helps you execute each one.
