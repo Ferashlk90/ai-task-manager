@@ -10,8 +10,11 @@ const key = new TextEncoder().encode(secret);
 export const SESSION_COOKIE = "ptm_session";
 export const PENDING_COOKIE = "ptm_pending";
 
-export type SessionPayload = { userId: string };
-export type PendingPayload = { userId: string; step: "totp" };
+// The `type` claim binds each token to its cookie role. verifyToken checks it,
+// so a pending (password-only) token can't be replayed as a full session — the
+// real defense behind the password+TOTP two-step.
+export type SessionPayload = { userId: string; type: "session" };
+export type PendingPayload = { userId: string; type: "pending" };
 
 export async function signToken(
   payload: Record<string, unknown>,
@@ -24,12 +27,16 @@ export async function signToken(
     .sign(key);
 }
 
-export async function verifyToken<T>(
+export async function verifyToken<T extends { type: string }>(
   token: string | undefined,
+  expectedType: T["type"],
 ): Promise<T | null> {
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, key, { algorithms: ["HS256"] });
+    // Reject a validly-signed token presented in the wrong role (e.g. a pending
+    // token copied into the session cookie).
+    if (payload.type !== expectedType) return null;
     return payload as T;
   } catch {
     return null;

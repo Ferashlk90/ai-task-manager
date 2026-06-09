@@ -37,7 +37,7 @@ function buildCsp(nonce: string): string {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = request.cookies.get(SESSION_COOKIE)?.value;
-  const session = await verifyToken<SessionPayload>(token);
+  const session = await verifyToken<SessionPayload>(token, "session");
   const onPublic = isPublic(pathname);
 
   // A fresh nonce per request; Next.js reads it from the CSP header and applies
