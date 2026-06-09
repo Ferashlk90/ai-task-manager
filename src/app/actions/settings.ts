@@ -1,6 +1,6 @@
 "use server";
 
-import { eq, isNull } from "drizzle-orm";
+import { eq, isNull, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { users, tasks } from "@/lib/db/schema";
@@ -32,13 +32,22 @@ export async function setModel(id: string): Promise<{ ok: boolean }> {
 }
 
 // One-time translate of tasks that don't yet have an English version (i.e.
-// created before the feature existed). Sequential to stay gentle on rate limits.
+// created before the feature existed). Processes a bounded chunk per call —
+// sequential to stay gentle on rate limits, capped so a large backlog can't hit
+// the function timeout. Returns `remaining` so the UI can prompt "run again".
+const BACKFILL_CHUNK = 10;
+
 export async function backfillEnglish(): Promise<{
   ok: boolean;
   count: number;
+  remaining: number;
 }> {
   await requireUser();
-  const pending = await db.select().from(tasks).where(isNull(tasks.titleEn));
+  const pending = await db
+    .select()
+    .from(tasks)
+    .where(isNull(tasks.titleEn))
+    .limit(BACKFILL_CHUNK);
 
   let count = 0;
   for (const t of pending) {
@@ -57,6 +66,11 @@ export async function backfillEnglish(): Promise<{
     }
   }
 
+  const [{ remaining }] = await db
+    .select({ remaining: sql<number>`count(*)::int` })
+    .from(tasks)
+    .where(isNull(tasks.titleEn));
+
   revalidatePath("/");
-  return { ok: true, count };
+  return { ok: true, count, remaining };
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { eq } from "drizzle-orm";
+import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { tasks } from "@/lib/db/schema";
@@ -89,26 +90,36 @@ export async function updateTask(
     set.priority = patch.priority;
   if (patch.aiAssist !== undefined) set.aiAssist = patch.aiAssist;
 
-  // Regenerate the English version when the text changed (and the feature is
-  // on). The edit form always sends both fields, so we translate from the patch.
+  await db.update(tasks).set(set).where(eq(tasks.id, id));
+  revalidatePath("/");
+
+  // Regenerate the English version AFTER responding so the save returns fast
+  // (a model round-trip used to block it). The edit form always sends both
+  // fields, so we translate from the patch. Failure leaves the old English.
   if (
     user.englishTasksEnabled &&
     typeof set.title === "string" &&
     typeof set.description === "string"
   ) {
-    try {
-      const en = await translateTaskToEnglish(set.title, set.description);
-      set.titleEn = en.titleEn || null;
-      set.descriptionEn = en.descriptionEn || null;
-    } catch (err) {
-      console.error("updateTask: English regeneration failed:", err);
-      // Leave the existing English as-is rather than failing the save.
-    }
+    const title = set.title;
+    const description = set.description;
+    after(async () => {
+      try {
+        const en = await translateTaskToEnglish(title, description);
+        await db
+          .update(tasks)
+          .set({
+            titleEn: en.titleEn || null,
+            descriptionEn: en.descriptionEn || null,
+          })
+          .where(eq(tasks.id, id));
+        revalidatePath("/");
+      } catch (err) {
+        console.error("updateTask: English regeneration failed:", err);
+      }
+    });
   }
 
-  await db.update(tasks).set(set).where(eq(tasks.id, id));
-
-  revalidatePath("/");
   return { ok: true };
 }
 

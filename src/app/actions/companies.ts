@@ -81,14 +81,13 @@ export async function reorderCompanies(
   orderedIds: string[],
 ): Promise<{ ok: boolean }> {
   await requireUser();
-  await Promise.all(
-    orderedIds.map((cid, index) =>
-      db
-        .update(companies)
-        .set({ sortOrder: index })
-        .where(eq(companies.id, cid)),
-    ),
+  if (orderedIds.length === 0) return { ok: true };
+  // One batched round trip instead of N separate UPDATEs, so a partial failure
+  // can't leave the sort order half-applied.
+  const updates = orderedIds.map((cid, index) =>
+    db.update(companies).set({ sortOrder: index }).where(eq(companies.id, cid)),
   );
+  await db.batch(updates as [(typeof updates)[number], ...typeof updates]);
   revalidatePath("/");
   return { ok: true };
 }

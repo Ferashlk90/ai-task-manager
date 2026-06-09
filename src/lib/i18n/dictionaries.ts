@@ -112,6 +112,7 @@ const ar = {
     backfill: "ترجمة المهام الحالية",
     backfilling: "جارٍ الترجمة…",
     backfillDone: "تمت ترجمة {count} مهمة",
+    backfillRemaining: "بقي {count} — اضغط مرة أخرى",
   },
 
   modelSettings: {
@@ -190,7 +191,9 @@ const ar = {
   exportCols: {
     company: "المجموعة",
     title: "العنوان",
+    titleEn: "العنوان (إنجليزي)",
     description: "الوصف",
+    descriptionEn: "الوصف (إنجليزي)",
     priority: "الأولوية",
     category: "الفئة",
     status: "الحالة",
@@ -307,6 +310,7 @@ const en: Dictionary = {
     backfill: "Translate existing tasks",
     backfilling: "Translating…",
     backfillDone: "Translated {count} task(s)",
+    backfillRemaining: "{count} left — run again",
   },
 
   modelSettings: {
@@ -385,7 +389,9 @@ const en: Dictionary = {
   exportCols: {
     company: "Group",
     title: "Title",
+    titleEn: "Title (EN)",
     description: "Description",
+    descriptionEn: "Description (EN)",
     priority: "Priority",
     category: "Category",
     status: "Status",

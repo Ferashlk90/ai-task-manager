@@ -1,6 +1,7 @@
 import { getBoardData } from "@/lib/data";
 import { getCurrentUser } from "@/lib/auth/user";
 import { getDictionary } from "@/lib/i18n/server";
+import { csvCell } from "@/lib/utils";
 
 export async function GET(req: Request) {
   const user = await getCurrentUser();
@@ -18,7 +19,9 @@ export async function GET(req: Request) {
     const headers = [
       cols.company,
       cols.title,
+      cols.titleEn,
       cols.description,
+      cols.descriptionEn,
       cols.priority,
       cols.category,
       cols.status,
@@ -29,7 +32,9 @@ export async function GET(req: Request) {
         ? (companyName.get(t.companyId) ?? "")
         : dict.common.uncategorized,
       t.title,
+      t.titleEn ?? "",
       t.description,
+      t.descriptionEn ?? "",
       dict.priority[t.priority],
       t.categoryId ? (categoryName.get(t.categoryId) ?? "") : "",
       dict.status[t.status],
@@ -54,6 +59,7 @@ export async function GET(req: Request) {
   const payload = {
     exportedAt: new Date().toISOString(),
     companies,
+    categories,
     tasks,
   };
 
@@ -63,8 +69,4 @@ export async function GET(req: Request) {
       "Content-Disposition": `attachment; filename="tasks-${stamp}.json"`,
     },
   });
-}
-
-function csvCell(value: string): string {
-  return `"${(value ?? "").replace(/"/g, '""')}"`;
 }

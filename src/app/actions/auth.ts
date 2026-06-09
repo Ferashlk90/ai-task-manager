@@ -20,6 +20,12 @@ import { checkRateLimit, registerFailure, resetLimit } from "@/lib/auth/rate-lim
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
+// A real cost-12 bcrypt hash of a throwaway string. When the submitted email
+// doesn't match, we still verify the password against this so a failed login
+// takes the same time whether or not the email was correct (no timing oracle).
+const DUMMY_HASH =
+  "$2b$12$V3A4uUeewCQjihwUuebxZ.1wJSKkZeXGnVdUZ4gsWl0e4xCAawNIO";
+
 function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
@@ -112,14 +118,15 @@ export async function loginStep1(
 
   const user = await getUserRow();
   const normalized = normalizeEmail(email);
+  const emailMatches =
+    !!user?.isSetup && !!user.passwordHash && user.email === normalized;
 
-  const valid =
-    user?.isSetup &&
-    user.passwordHash &&
-    user.email === normalized &&
-    (await verifyPassword(password, user.passwordHash));
+  // Always run exactly one bcrypt comparison (dummy hash on no match) so timing
+  // doesn't reveal whether the email was right.
+  const hash = emailMatches && user?.passwordHash ? user.passwordHash : DUMMY_HASH;
+  const passwordOk = await verifyPassword(password, hash);
 
-  if (!user || !valid) {
+  if (!user || !emailMatches || !passwordOk) {
     registerFailure(key);
     return { ok: false, error: t.invalidCredentials };
   }

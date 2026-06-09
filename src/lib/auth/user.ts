@@ -1,5 +1,5 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import type { DbUser } from "@/lib/db/schema";
@@ -7,7 +7,13 @@ import { getSession } from "./session";
 
 // Single-user app: there is at most one row in `users`.
 export async function getUserRow(): Promise<DbUser | null> {
-  const rows = await db.select().from(users).limit(1);
+  // Order by createdAt so the "one user" is deterministic even if a duplicate
+  // row ever slipped in (e.g. a setup race).
+  const rows = await db
+    .select()
+    .from(users)
+    .orderBy(asc(users.createdAt))
+    .limit(1);
   return rows[0] ?? null;
 }
 

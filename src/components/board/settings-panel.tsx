@@ -210,6 +210,7 @@ function EnglishSettings({ enabled }: { enabled: boolean }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [done, setDone] = useState<number | null>(null);
+  const [remaining, setRemaining] = useState(0);
 
   function toggle(next: boolean) {
     startTransition(async () => {
@@ -223,6 +224,7 @@ function EnglishSettings({ enabled }: { enabled: boolean }) {
     startTransition(async () => {
       const res = await backfillEnglish();
       setDone(res.count);
+      setRemaining(res.remaining);
       router.refresh();
     });
   }
@@ -253,6 +255,8 @@ function EnglishSettings({ enabled }: { enabled: boolean }) {
           {done !== null && (
             <span className="text-xs text-muted">
               {t.taskSettings.backfillDone.replace("{count}", String(done))}
+              {remaining > 0 &&
+                ` · ${t.taskSettings.backfillRemaining.replace("{count}", String(remaining))}`}
             </span>
           )}
         </div>

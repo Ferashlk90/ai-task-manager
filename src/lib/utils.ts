@@ -4,3 +4,12 @@ export function cn(
 ): string {
   return classes.filter(Boolean).join(" ");
 }
+
+// Format a value as a CSV cell: neutralize spreadsheet formula injection by
+// prefixing cells that start with = + - @ (a leading ' makes Excel/Sheets treat
+// them as text), then escape embedded quotes and wrap the whole cell in quotes.
+export function csvCell(value: string): string {
+  const v = value ?? "";
+  const safe = /^[=+\-@]/.test(v) ? `'${v}` : v;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
