@@ -115,8 +115,6 @@ export async function POST(req: Request) {
       },
       ...messages,
     ],
-    onFinish: ({ providerMetadata }) =>
-      console.log("assistant cache:", providerMetadata?.anthropic),
     onError: (err) => console.error("assistant stream error:", err),
   });
 

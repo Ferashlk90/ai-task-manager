@@ -106,8 +106,7 @@ export async function POST(
     model: getModel(user.aiModel),
     system: buildSystemPrompt(task, companyName, categoryName, dict),
     messages,
-    onFinish: async ({ text, providerMetadata }) => {
-      console.log("task chat cache:", providerMetadata?.anthropic);
+    onFinish: async ({ text }) => {
       if (text.trim()) {
         await db.insert(taskMessages).values({
           taskId: id,
@@ -118,6 +117,11 @@ export async function POST(
     },
     onError: (err) => console.error("chat stream error:", err),
   });
+
+  // Drive the stream to completion server-side regardless of the client. If the
+  // user closes the drawer / navigates mid-reply, onFinish still runs and the
+  // assistant message is persisted instead of lost (and the model call wasted).
+  result.consumeStream();
 
   return result.toTextStreamResponse();
 }
