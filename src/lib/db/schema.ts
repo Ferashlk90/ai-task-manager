@@ -19,6 +19,10 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   passwordHash: text("password_hash"),
   totpSecret: text("totp_secret"),
+  // Last accepted TOTP time-step (RFC 6238 T). A code at or before this step is
+  // rejected as a replay. Nullable: null until the first successful verification,
+  // which also keeps the migration safe for the existing row.
+  totpLastStep: integer("totp_last_step"),
   isSetup: boolean("is_setup").notNull().default(false),
   // Master switch for the "English versions of tasks" feature.
   englishTasksEnabled: boolean("english_tasks_enabled").notNull().default(true),

@@ -54,23 +54,38 @@ export async function completeSetup(input: {
     return { ok: false, error: t.accountExists };
   }
 
-  if (!(await verifyTotp(input.token, input.secret))) {
+  const totp = await verifyTotp(input.token, input.secret);
+  if (!totp.valid) {
     return { ok: false, error: t.invalidTotp };
   }
 
   const passwordHash = await hashPassword(password);
 
+  // Seed totpLastStep with the enrollment step so the same code can't be
+  // immediately replayed as the first login.
   let userId: string;
   if (existing) {
     await db
       .update(users)
-      .set({ email, passwordHash, totpSecret: input.secret, isSetup: true })
+      .set({
+        email,
+        passwordHash,
+        totpSecret: input.secret,
+        totpLastStep: totp.step,
+        isSetup: true,
+      })
       .where(eq(users.id, existing.id));
     userId = existing.id;
   } else {
     const [created] = await db
       .insert(users)
-      .values({ email, passwordHash, totpSecret: input.secret, isSetup: true })
+      .values({
+        email,
+        passwordHash,
+        totpSecret: input.secret,
+        totpLastStep: totp.step,
+        isSetup: true,
+      })
       .returning({ id: users.id });
     userId = created.id;
   }
@@ -138,11 +153,27 @@ export async function loginStep2(token: string): Promise<ActionResult> {
     return { ok: false, error: t.verifyFailed };
   }
 
-  if (!(await verifyTotp(token, user.totpSecret))) {
+  const totp = await verifyTotp(token, user.totpSecret);
+  if (!totp.valid) {
     registerFailure(key);
     return { ok: false, error: t.invalidCode };
   }
 
+  // Replay guard: reject a code from a time-step already used. Null-guarded so
+  // the first login after this feature ships (totpLastStep === null) is accepted.
+  if (
+    user.totpLastStep != null &&
+    totp.step != null &&
+    totp.step <= user.totpLastStep
+  ) {
+    registerFailure(key);
+    return { ok: false, error: t.invalidCode };
+  }
+
+  await db
+    .update(users)
+    .set({ totpLastStep: totp.step })
+    .where(eq(users.id, user.id));
   await clearPending();
   resetLimit(key);
   await createSession(user.id);
