@@ -2,8 +2,10 @@ import "server-only";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { getActiveModel } from "./model";
+import { sanitizeOrganized, type OrganizedTask } from "./sanitize";
 import type { Company, Category } from "@/lib/types";
-import type { Priority } from "@/lib/constants";
+
+export type { OrganizedTask };
 
 const taskSchema = z.object({
   title: z
@@ -35,17 +37,6 @@ const taskSchema = z.object({
 });
 
 const outputSchema = z.object({ tasks: z.array(taskSchema) });
-
-export type OrganizedTask = {
-  title: string;
-  titleEn: string;
-  description: string;
-  descriptionEn: string;
-  companyId: string | null;
-  categoryId: string | null;
-  priority: Priority;
-  aiAssist: boolean;
-};
 
 function buildSystemPrompt(
   companies: Company[],
@@ -87,18 +78,5 @@ export async function organizeText(
     output: Output.object({ schema: outputSchema }),
   });
 
-  const validCompanyIds = new Set(companies.map((c) => c.id));
-  const validCategoryIds = new Set(categories.map((c) => c.id));
-  return output.tasks.map((t) => ({
-    title: t.title.trim(),
-    titleEn: t.titleEn?.trim() ?? "",
-    description: t.description?.trim() ?? "",
-    descriptionEn: t.descriptionEn?.trim() ?? "",
-    companyId:
-      t.companyId && validCompanyIds.has(t.companyId) ? t.companyId : null,
-    categoryId:
-      t.categoryId && validCategoryIds.has(t.categoryId) ? t.categoryId : null,
-    priority: t.priority,
-    aiAssist: t.aiAssist,
-  }));
+  return sanitizeOrganized(output.tasks, companies, categories);
 }
