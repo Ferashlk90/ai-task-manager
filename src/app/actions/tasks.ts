@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { after } from "next/server";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
@@ -126,6 +126,48 @@ export async function updateTask(
 export async function deleteTask(id: string): Promise<{ ok: boolean }> {
   await requireUser();
   await db.delete(tasks).where(eq(tasks.id, id));
+  revalidatePath("/");
+  return { ok: true };
+}
+
+// ── Bulk ops for the list view ────────────────────────────────────────────
+// Metadata-only patches (status/priority/company/category), so unlike
+// updateTask there's no title/description change and no English re-translation.
+// One UPDATE for the whole selection via inArray.
+export async function bulkUpdateTasks(
+  ids: string[],
+  patch: {
+    status?: Status;
+    priority?: Priority;
+    companyId?: string | null;
+    categoryId?: string | null;
+  },
+): Promise<{ ok: boolean; count: number }> {
+  await requireUser();
+  if (ids.length === 0) return { ok: true, count: 0 };
+
+  const set: Record<string, unknown> = { updatedAt: new Date() };
+  if (patch.status !== undefined && asStatus(patch.status))
+    set.status = patch.status;
+  if (patch.priority !== undefined && asPriority(patch.priority))
+    set.priority = patch.priority;
+  if (patch.companyId !== undefined) set.companyId = patch.companyId;
+  if (patch.categoryId !== undefined) set.categoryId = patch.categoryId;
+
+  // Only updatedAt would change → nothing meaningful was requested.
+  if (Object.keys(set).length === 1) return { ok: true, count: 0 };
+
+  await db.update(tasks).set(set).where(inArray(tasks.id, ids));
+  revalidatePath("/");
+  return { ok: true, count: ids.length };
+}
+
+export async function bulkDeleteTasks(
+  ids: string[],
+): Promise<{ ok: boolean }> {
+  await requireUser();
+  if (ids.length === 0) return { ok: true };
+  await db.delete(tasks).where(inArray(tasks.id, ids));
   revalidatePath("/");
   return { ok: true };
 }

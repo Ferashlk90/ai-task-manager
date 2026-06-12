@@ -55,6 +55,23 @@ const ar = {
     clearSearch: "مسح البحث",
   },
 
+  view: { board: "لوحة", list: "قائمة" },
+
+  list: { selectAll: "تحديد الكل" },
+
+  bulk: {
+    selected: "{count} محدّدة",
+    clear: "إلغاء التحديد",
+    setStatus: "الحالة…",
+    setPriority: "الأولوية…",
+    setCompany: "المجموعة…",
+    setCategory: "الفئة…",
+    uncategorized: "غير مصنّف",
+    noCategory: "بدون فئة",
+    delete: "حذف",
+    deleteConfirm: "حذف {count} مهمة؟",
+  },
+
   composer: {
     placeholder:
       "اكتب كل مهامك هنا بأي لغة وأي ترتيب… سيصنّفها الذكاء الاصطناعي حسب المجموعة والفئة والأولوية.",
@@ -251,6 +268,23 @@ const en: Dictionary = {
     manageCompanies: "Groups & Categories",
     searchPlaceholder: "Search tasks…",
     clearSearch: "Clear search",
+  },
+
+  view: { board: "Board", list: "List" },
+
+  list: { selectAll: "Select all" },
+
+  bulk: {
+    selected: "{count} selected",
+    clear: "Clear",
+    setStatus: "Status…",
+    setPriority: "Priority…",
+    setCompany: "Group…",
+    setCategory: "Category…",
+    uncategorized: "Uncategorized",
+    noCategory: "No category",
+    delete: "Delete",
+    deleteConfirm: "Delete {count} task(s)?",
   },
 
   composer: {

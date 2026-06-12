@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Drawer } from "@/components/ui/drawer";
 import { FilterBar } from "./filter-bar";
 import { SearchBar } from "./search-bar";
@@ -11,7 +12,12 @@ import { TaskPanel } from "./task-panel";
 import { SettingsPanel } from "./settings-panel";
 import { AssistantWidget } from "./assistant-widget";
 import { TopBar } from "./top-bar";
+import { ViewToggle } from "./view-toggle";
+import { TaskList } from "./task-list";
+import { BulkBar, type BulkPatch } from "./bulk-bar";
+import { bulkUpdateTasks, bulkDeleteTasks } from "@/app/actions/tasks";
 import { useI18n } from "@/lib/i18n/context";
+import type { ViewMode } from "@/lib/view";
 import type { Status } from "@/lib/constants";
 import type { Company, Category, Task } from "@/lib/types";
 
@@ -25,6 +31,7 @@ export function Board({
   englishEnabled,
   models,
   currentModel,
+  initialView,
 }: {
   companies: Company[];
   categories: Category[];
@@ -33,13 +40,18 @@ export function Board({
   englishEnabled: boolean;
   models: { id: string; label: string }[];
   currentModel: string;
+  initialView: ViewMode;
 }) {
   const { t } = useI18n();
+  const router = useRouter();
   const [filter, setFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<Status | null>(null);
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [view, setView] = useState<ViewMode>(initialView);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkPending, startBulk] = useTransition();
 
   const q = query.trim().toLowerCase();
 
@@ -97,6 +109,65 @@ export function Board({
     [categories],
   );
 
+  const companyById = useMemo(
+    () => new Map(companies.map((c) => [c.id, c])),
+    [companies],
+  );
+
+  // The list is flat, so it also applies the company filter (the board applies
+  // that only at section level). Search + status already fed shownTasks.
+  const listTasks = useMemo(
+    () => (filter ? shownTasks.filter((task) => task.companyId === filter) : shownTasks),
+    [shownTasks, filter],
+  );
+
+  // Effective selection = chosen ids that still exist (a task can vanish via a
+  // single delete in the drawer while it's selected here). Derived rather than
+  // stored, so we avoid setState-in-effect churn.
+  const taskIds = useMemo(() => new Set(tasks.map((task) => task.id)), [tasks]);
+  const selectedCount = useMemo(() => {
+    let n = 0;
+    for (const id of selectedIds) if (taskIds.has(id)) n++;
+    return n;
+  }, [selectedIds, taskIds]);
+
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) =>
+      listTasks.every((task) => prev.has(task.id))
+        ? new Set()
+        : new Set(listTasks.map((task) => task.id)),
+    );
+  }
+
+  function applyBulk(patch: BulkPatch) {
+    const ids = [...selectedIds].filter((id) => taskIds.has(id));
+    if (ids.length === 0) return;
+    startBulk(async () => {
+      await bulkUpdateTasks(ids, patch);
+      setSelectedIds(new Set());
+      router.refresh();
+    });
+  }
+
+  function deleteBulk() {
+    const ids = [...selectedIds].filter((id) => taskIds.has(id));
+    if (ids.length === 0) return;
+    startBulk(async () => {
+      await bulkDeleteTasks(ids);
+      setSelectedIds(new Set());
+      router.refresh();
+    });
+  }
+
   const selectedTask = selectedId
     ? (tasks.find((t) => t.id === selectedId) ?? null)
     : null;
@@ -128,7 +199,14 @@ export function Board({
       <div className="mx-auto max-w-6xl space-y-5 px-4 py-5 sm:px-6">
         <OrganizeComposer hasCompanies={companies.length > 0} />
 
-        {!isEmpty && <SearchBar value={query} onChange={setQuery} />}
+        {!isEmpty && (
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <SearchBar value={query} onChange={setQuery} />
+            </div>
+            <ViewToggle view={view} onChange={setView} />
+          </div>
+        )}
 
         <FilterBar
           companies={companies}
@@ -153,6 +231,25 @@ export function Board({
             </p>
             <p className="mt-1 text-xs text-faint">{t.board.noTasksHint}</p>
           </div>
+        ) : view === "list" ? (
+          listTasks.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-line px-6 py-12 text-center text-sm text-faint">
+              {t.board.sectionEmpty}
+            </p>
+          ) : (
+            <div className={selectedCount > 0 ? "pb-24" : "pb-8"}>
+              <TaskList
+                tasks={listTasks}
+                companyById={companyById}
+                categoryById={categoryById}
+                english={englishEnabled}
+                selectedIds={selectedIds}
+                onToggle={toggleSelected}
+                onToggleAll={toggleSelectAll}
+                onTaskClick={(task) => setSelectedId(task.id)}
+              />
+            </div>
+          )
         ) : noMatches ? (
           <p className="rounded-2xl border border-dashed border-line px-6 py-12 text-center text-sm text-faint">
             {t.board.sectionEmpty}
@@ -217,6 +314,18 @@ export function Board({
       </Drawer>
 
       <AssistantWidget />
+
+      {view === "list" && selectedCount > 0 && (
+        <BulkBar
+          count={selectedCount}
+          companies={companies}
+          categories={categories}
+          pending={bulkPending}
+          onApply={applyBulk}
+          onDelete={deleteBulk}
+          onClear={() => setSelectedIds(new Set())}
+        />
+      )}
     </div>
   );
 }
