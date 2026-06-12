@@ -1,6 +1,6 @@
 // View-mode primitives — plain module, safe on server or client.
 
-export const VIEW_MODES = ["board", "list"] as const;
+export const VIEW_MODES = ["board", "list", "chat"] as const;
 export type ViewMode = (typeof VIEW_MODES)[number];
 
 // Not httpOnly — a display preference. Set client-side by the toggle and read
@@ -9,5 +9,5 @@ export const VIEW_COOKIE = "ptm_view";
 export const DEFAULT_VIEW: ViewMode = "board";
 
 export function isViewMode(value: unknown): value is ViewMode {
-  return value === "board" || value === "list";
+  return value === "board" || value === "list" || value === "chat";
 }

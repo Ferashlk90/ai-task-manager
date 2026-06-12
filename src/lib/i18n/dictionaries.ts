@@ -55,9 +55,18 @@ const ar = {
     clearSearch: "مسح البحث",
   },
 
-  view: { board: "لوحة", list: "قائمة" },
+  view: { board: "لوحة", list: "قائمة", chat: "محادثة" },
 
   list: { selectAll: "تحديد الكل" },
+
+  chats: {
+    assistantThread: "المساعد العام",
+    messageCount: "{count} رسالة",
+    noMessages: "لا رسائل بعد",
+    pickConversation: "اختر محادثة لعرضها",
+    delete: "حذف المحادثة",
+    deleteConfirm: "حذف محادثة «{name}»؟",
+  },
 
   bulk: {
     selected: "{count} محدّدة",
@@ -270,9 +279,18 @@ const en: Dictionary = {
     clearSearch: "Clear search",
   },
 
-  view: { board: "Board", list: "List" },
+  view: { board: "Board", list: "List", chat: "Chat" },
 
   list: { selectAll: "Select all" },
+
+  chats: {
+    assistantThread: "General assistant",
+    messageCount: "{count} messages",
+    noMessages: "No messages yet",
+    pickConversation: "Pick a conversation to view",
+    delete: "Delete conversation",
+    deleteConfirm: "Delete the “{name}” conversation?",
+  },
 
   bulk: {
     selected: "{count} selected",

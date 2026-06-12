@@ -1,7 +1,13 @@
 import "server-only";
-import { asc, desc, eq } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { companies, categories, tasks, taskMessages } from "@/lib/db/schema";
+import {
+  companies,
+  categories,
+  tasks,
+  taskMessages,
+  assistantMessages,
+} from "@/lib/db/schema";
 import type {
   DbCompany,
   DbCategory,
@@ -9,6 +15,17 @@ import type {
   DbTaskMessage,
 } from "@/lib/db/schema";
 import type { Company, Category, Task, ChatMessage } from "@/lib/types";
+
+// A conversation shown in the Chat view: either a task's thread or the single
+// global assistant thread.
+export type ChatThread = {
+  kind: "task" | "assistant";
+  taskId: string | null;
+  title: string;
+  titleEn: string | null;
+  lastAt: string | null;
+  count: number;
+};
 
 function toCompany(row: DbCompany): Company {
   return {
@@ -98,4 +115,62 @@ export async function getTaskMessages(taskId: string): Promise<ChatMessage[]> {
     .where(eq(taskMessages.taskId, taskId))
     .orderBy(asc(taskMessages.createdAt));
   return rows.map(toMessage);
+}
+
+export async function getAssistantMessages(): Promise<ChatMessage[]> {
+  const rows = await db
+    .select()
+    .from(assistantMessages)
+    .orderBy(asc(assistantMessages.createdAt));
+  return rows.map((r) => ({
+    id: r.id,
+    role: r.role,
+    content: r.content,
+    createdAt: r.createdAt.toISOString(),
+  }));
+}
+
+// One thread per task that has messages + the (always-present) assistant thread,
+// assistant first then tasks by most-recent activity.
+export async function getChatThreads(): Promise<ChatThread[]> {
+  const taskRows = await db
+    .select({
+      taskId: taskMessages.taskId,
+      title: tasks.title,
+      titleEn: tasks.titleEn,
+      lastAt: sql<string>`max(${taskMessages.createdAt})`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(taskMessages)
+    .innerJoin(tasks, eq(taskMessages.taskId, tasks.id))
+    .groupBy(taskMessages.taskId, tasks.title, tasks.titleEn);
+
+  const [asst] = await db
+    .select({
+      lastAt: sql<string | null>`max(${assistantMessages.createdAt})`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(assistantMessages);
+
+  const taskThreads: ChatThread[] = taskRows
+    .map((r) => ({
+      kind: "task" as const,
+      taskId: r.taskId,
+      title: r.title,
+      titleEn: r.titleEn,
+      lastAt: r.lastAt,
+      count: r.count,
+    }))
+    .sort((a, b) => (a.lastAt < b.lastAt ? 1 : -1)); // most recent first
+
+  const assistantThread: ChatThread = {
+    kind: "assistant",
+    taskId: null,
+    title: "",
+    titleEn: null,
+    lastAt: asst?.lastAt ?? null,
+    count: asst?.count ?? 0,
+  };
+
+  return [assistantThread, ...taskThreads];
 }

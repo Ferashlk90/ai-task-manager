@@ -14,6 +14,7 @@ import { AssistantWidget } from "./assistant-widget";
 import { TopBar } from "./top-bar";
 import { ViewToggle } from "./view-toggle";
 import { TaskList } from "./task-list";
+import { ChatView } from "./chat-view";
 import { BulkBar, type BulkPatch } from "./bulk-bar";
 import { bulkUpdateTasks, bulkDeleteTasks } from "@/app/actions/tasks";
 import { useI18n } from "@/lib/i18n/context";
@@ -197,26 +198,34 @@ export function Board({
       <TopBar email={email} onOpenSettings={() => setSettingsOpen(true)} />
 
       <div className="mx-auto max-w-6xl space-y-5 px-4 py-5 sm:px-6">
-        <OrganizeComposer hasCompanies={companies.length > 0} />
+        {view !== "chat" && (
+          <OrganizeComposer hasCompanies={companies.length > 0} />
+        )}
 
-        {!isEmpty && (
-          <div className="flex items-center gap-2">
+        {/* Toggle is always available (so Chat is reachable even with no tasks);
+            search is task-board only. */}
+        <div className="flex items-center gap-2">
+          {view !== "chat" && !isEmpty && (
             <div className="flex-1">
               <SearchBar value={query} onChange={setQuery} />
             </div>
+          )}
+          <div className="ms-auto">
             <ViewToggle view={view} onChange={setView} />
           </div>
+        </div>
+
+        {view !== "chat" && (
+          <FilterBar
+            companies={companies}
+            counts={counts}
+            total={base.length}
+            active={filter}
+            onSelect={setFilter}
+          />
         )}
 
-        <FilterBar
-          companies={companies}
-          counts={counts}
-          total={base.length}
-          active={filter}
-          onSelect={setFilter}
-        />
-
-        {!isEmpty && (
+        {view !== "chat" && !isEmpty && (
           <StatusTabs
             counts={statusCounts}
             active={statusFilter}
@@ -224,7 +233,9 @@ export function Board({
           />
         )}
 
-        {isEmpty ? (
+        {view === "chat" ? (
+          <ChatView tasks={tasks} english={englishEnabled} />
+        ) : isEmpty ? (
           <div className="rounded-2xl border border-dashed border-line bg-surface/50 px-6 py-16 text-center">
             <p className="text-sm font-medium text-muted">
               {t.board.noTasksYet}

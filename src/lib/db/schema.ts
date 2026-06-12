@@ -94,6 +94,17 @@ export const taskMessages = pgTable("task_messages", {
     .defaultNow(),
 });
 
+// Single global thread for the board-wide assistant (no task FK). One row per
+// message, same shape as task_messages.
+export const assistantMessages = pgTable("assistant_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  role: messageRoleEnum("role").notNull(),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
 export const companiesRelations = relations(companies, ({ many }) => ({
   tasks: many(tasks),
 }));
@@ -125,4 +136,5 @@ export type DbCompany = typeof companies.$inferSelect;
 export type DbCategory = typeof categories.$inferSelect;
 export type DbTask = typeof tasks.$inferSelect;
 export type DbTaskMessage = typeof taskMessages.$inferSelect;
+export type DbAssistantMessage = typeof assistantMessages.$inferSelect;
 export type DbUser = typeof users.$inferSelect;

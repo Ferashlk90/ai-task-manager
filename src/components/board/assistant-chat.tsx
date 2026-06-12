@@ -4,20 +4,38 @@ import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/lib/i18n/context";
 import { ChatMarkdown } from "@/components/chat-markdown";
 import { CopyMessageButton } from "@/components/board/copy-message-button";
+import { loadAssistantMessages } from "@/app/actions/chat";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
-// Board-wide assistant. Ephemeral: the conversation lives only in component
-// state and is sent to /api/assistant/chat each turn (no persistence). The
-// route loads the live task list server-side for context.
+// Board-wide assistant. The conversation is persisted (a single global thread):
+// it's loaded on mount and each turn posts only the new message to
+// /api/assistant/chat, which owns history and adds the live task list as context.
+// The floating widget and the Chat view share this one thread.
 export function AssistantChat() {
   const { t } = useI18n();
   const [messages, setMessages] = useState<Msg[]>([]);
   const [draft, setDraft] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    loadAssistantMessages()
+      .then((msgs) => {
+        if (active) {
+          setMessages(msgs.map((m) => ({ role: m.role, content: m.content })));
+          setLoading(false);
+        }
+      })
+      .catch(() => active && setLoading(false));
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -36,7 +54,7 @@ export function AssistantChat() {
       const res = await fetch("/api/assistant/chat", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ messages: next }),
+        body: JSON.stringify({ message: content }),
       });
       if (!res.ok || !res.body) throw new Error("bad response");
       const reader = res.body.getReader();
@@ -62,7 +80,9 @@ export function AssistantChat() {
   return (
     <div className="flex h-full flex-col">
       <div className="scrollable flex-1 space-y-2.5 overflow-y-auto px-5 py-5">
-        {empty ? (
+        {loading ? (
+          <p className="text-xs text-faint">{t.common.loading}</p>
+        ) : empty ? (
           <div className="space-y-3">
             <p className="rounded-xl bg-surface-muted px-3 py-3 text-xs leading-6 text-muted">
               {t.assistant.intro}

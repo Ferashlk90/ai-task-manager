@@ -1,10 +1,16 @@
 import { streamText, type ModelMessage } from "ai";
+import { asc } from "drizzle-orm";
 import { getModel } from "@/lib/ai/model";
+import { db } from "@/lib/db";
+import { assistantMessages } from "@/lib/db/schema";
 import { getCurrentUser } from "@/lib/auth/user";
 import { getBoardData } from "@/lib/data";
 import type { Company, Task } from "@/lib/types";
 
 export const maxDuration = 60;
+
+// Most recent turns re-sent to the model; the full thread lives in the DB.
+const MAX_HISTORY = 20;
 
 const STATUS_LABEL: Record<Task["status"], string> = {
   new: "New",
@@ -76,47 +82,59 @@ Tasks (grouped by company):
 ${context}`;
 }
 
-type IncomingMessage = { role: "user" | "assistant"; content: string };
-
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
 
-  const body = (await req.json()) as { messages?: IncomingMessage[] };
-  const incoming = Array.isArray(body.messages) ? body.messages : [];
+  const { message } = (await req.json()) as { message?: string };
+  const userMessage = message?.trim();
+  if (!userMessage) return new Response("Empty message", { status: 400 });
 
-  // Keep the request bounded and well-formed; the client holds the (ephemeral)
-  // conversation, so we only trust role/content shape and cap the length.
-  const messages: ModelMessage[] = incoming
-    .filter(
-      (m) =>
-        (m.role === "user" || m.role === "assistant") &&
-        typeof m.content === "string" &&
-        m.content.trim().length > 0,
-    )
-    .slice(-20)
-    .map((m) => ({ role: m.role, content: m.content }) as ModelMessage);
+  // The thread is persisted now, so the server owns history (the client just
+  // sends the new message).
+  const history = await db
+    .select()
+    .from(assistantMessages)
+    .orderBy(asc(assistantMessages.createdAt));
 
-  if (messages.length === 0) return new Response("Empty", { status: 400 });
+  await db
+    .insert(assistantMessages)
+    .values({ role: "user", content: userMessage });
 
   const { companies, tasks } = await getBoardData();
   const system = buildSystemPrompt(buildContext(companies, tasks));
 
+  const recent = history.slice(-MAX_HISTORY);
+  const priorMessages: ModelMessage[] = recent.map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+
   const result = streamText({
     model: getModel(user.aiModel),
-    // System prompt as a cached message: the board snapshot is identical across
-    // turns of a session, so turns 2+ read it from cache instead of re-billing
-    // it. (Anthropic only caches prefixes past a ~1024-token minimum.)
+    // System prompt as a cached message: the board snapshot is stable across a
+    // session, so turns 2+ read it from cache instead of re-billing it.
     messages: [
       {
         role: "system",
         content: system,
         providerOptions: { anthropic: { cacheControl: { type: "ephemeral" } } },
       },
-      ...messages,
+      ...priorMessages,
+      { role: "user", content: userMessage },
     ],
+    onFinish: async ({ text }) => {
+      if (text.trim()) {
+        await db
+          .insert(assistantMessages)
+          .values({ role: "assistant", content: text });
+      }
+    },
     onError: (err) => console.error("assistant stream error:", err),
   });
+
+  // Persist the reply even if the client disconnects mid-stream.
+  result.consumeStream();
 
   return result.toTextStreamResponse();
 }
